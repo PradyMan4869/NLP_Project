@@ -1,16 +1,12 @@
 This is a page for all current ideas that we have:
 
-1) Election results by analyzing tweets
-2) Fake news classifier/detection [https://www.kaggle.com/code/jeongwonkim10516/nlp-fake-news-with-bert-99-55-top1]
+
+2) Fake news classifier/detection [https://www.kaggle.com/code/jeongwonkim10516/nlp-fake-news-with-bert-99-55-top1]  *  [Combine-Categorization of news category]
 3) https://www.kaggle.com/competitions/AI4Code/overview  [Has Dataset]
-4) Categorization of news category
-5) Detection of Toxicity in a tweet/text [https://www.kaggle.com/competitions/jigsaw-unintended-bias-in-toxicity-classification/discussion/103280]
-6) RESTful API for similarity
-7) Alignment analysis using Twitter
+6) RESTful API for similarity - Plagiarism
 8) Identification of place names from a natural language sentence. 
-9) AI-powered Legal Documentation Assistant 
-10) Fake Social Media Profile detection and reporting
-11) Tweet sentiment's impact on stock returns. [https://www.kaggle.com/datasets/thedevastator/tweet-sentiment-s-impact-on-stock-returns]
+9) AI-powered Legal Documentation Assistant
+
 
 
 We must first find datasets for all of the above.
