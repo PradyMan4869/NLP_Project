@@ -3,27 +3,16 @@ This is a page for all current ideas that we have:
 
 2) Fake news classifier/detection [https://www.kaggle.com/code/jeongwonkim10516/nlp-fake-news-with-bert-99-55-top1]  *  [Combine-Categorization of news category]
 3) https://www.kaggle.com/competitions/AI4Code/overview  [Has Dataset]
-6) RESTful API for similarity - Plagiarism
-8) Identification of place names from a natural language sentence. 
 9) AI-powered Legal Documentation Assistant
 
 
+https://www.kaggle.com/datasets/anudit/india-legal-cases-dataset
+
+Legal NLP ideas:
+1) Summarizer: Text to sentence to words to vectors to Similarity Matrix to Graphs to Sentence Ranking to Summary
+2) 
 
 We must first find datasets for all of the above.
-
-
-
-Explanation for the 8th idea:  [Taken from SIH]
-Building a geospatial querying system based on natural language requires identifying geospatial entities by their names. 
-The scope of this work involves automatically identifying names of places from a sentence. 
-A universe of canonical names (single way of spelling and correct spelling) will be provided in the form of tables. 
-For example, a Country, City, and State table containing the possible universe of names. 
-It should take into account spelling errors in the names and multiple ways of spelling and mentioning the same entity in the query and map it to a canonical name.
-For example- Given an input- Which of the following saw the highest average temperature in January, Maharashtra, Ahmedabad, or entire New Zealand? 
-Here, first, the system should use NLP to filter out words that are not names of places, then it must do a fuzzy match to find candidate canonical names in tables and report the output. 
-Output- Token- Maharashtra, Canonical name: Maharashtra, table- State Token: Ahmedabad, Canonical name- Ahmedabad, table- City Token- New-Zealand, Canonical name: New Zealand, table- Country Please note that the query need not be a question. 
-It can also be an imperative sentence for example. 
-Show me a graph of rainfall for Chennai for the month of October
 
 
 Explanation for the 9th idea:  [Taken from SIH]
