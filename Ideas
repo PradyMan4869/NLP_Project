@@ -4,7 +4,8 @@ This is a page for all current ideas that we have:
 2) Fake news classifier/detection [https://www.kaggle.com/code/jeongwonkim10516/nlp-fake-news-with-bert-99-55-top1]  *  [Combine-Categorization of news category]
 3) https://www.kaggle.com/competitions/AI4Code/overview  [Has Dataset]
 9) AI-powered Legal Documentation Assistant
-
+  (a) https://www.indiacode.nic.in/bitstream/123456789/2263/1/aA1860-45.pdf - The Government of India's official codification of the Indian Penal Code
+  (b) Proposal: An action description (user or raw input, whichever goes) which checks against the IPC and returns potential violations?
 
 https://www.kaggle.com/datasets/anudit/india-legal-cases-dataset
 
