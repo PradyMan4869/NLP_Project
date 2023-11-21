@@ -1,0 +1,91 @@
+!pip install spacy 
+!python -m spacy download en_core_web_lg
+
+# Import the necessary libraries
+import spacy # for NLP tasks
+import pandas as pd # for data manipulation
+import requests # for web scraping
+import re # for regular expressions
+
+# Load the pre-trained NLP model
+nlp = spacy.load("en_core_web_lg")
+
+# Define a function to scrape the IPC data from a website
+def get_ipc_data(url):
+  # Send a GET request to the url and get the response
+  response = requests.get(url)
+  # Check if the response is successful
+  if response.status_code == 200:
+    # Parse the response content as HTML
+    html = response.text
+    # Extract the IPC sections, descriptions, and penalties using regular expressions
+    sections = re.findall(r"<h3>(\d+\.\s.+?)</h3>", html)
+    descriptions = re.findall(r"<p>(.+?)</p>", html)
+    penalties = re.findall(r"<strong>(.+?)</strong>", html)
+    # Create a data frame with the extracted data
+    ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
+    # Return the data frame
+    return ipc_df
+  else:
+    # Raise an exception if the response is not successful
+    raise Exception(f"Failed to get the IPC data from {url}")
+
+# Define a function to analyze the user prompt for potential IPC violations
+def analyze_prompt(prompt):
+  # Apply the NLP model to the prompt
+  doc = nlp(prompt)
+  # Extract the key entities and actions from the prompt
+  entities = [ent.text for ent in doc.ents]
+  actions = [token.lemma_ for token in doc if token.pos_ == "VERB"]
+  # Initialize an empty list to store the identified violations
+  violations = []
+  # Loop through the IPC data frame
+  for index, row in ipc_df.iterrows():
+    # Check if any of the entities or actions match the IPC description
+    if any(word in row["description"] for word in entities + actions):
+      # Append the IPC section, description, and penalty to the violations list
+      violations.append((row["section"], row["description"], row["penalty"]))
+  # Return the violations list
+  return violations
+
+# Define a function to generate detailed explanations for each identified violation
+def generate_explanations(violations):
+  # Initialize an empty list to store the explanations
+  explanations = []
+  # Loop through the violations list
+  for violation in violations:
+    # Unpack the violation tuple
+    section, description, penalty = violation
+    # Generate an explanation using the violation details
+    explanation = f"According to IPC section {section}, {description}. The theoretical penalty for this violation is {penalty}."
+    # Append the explanation to the explanations list
+    explanations.append(explanation)
+  # Return the explanations list
+  return explanations
+
+# Define a function to present the final output in a user-friendly format
+def present_output(explanations):
+  # Check if the explanations list is empty or not
+  if explanations:
+    # Join the explanations with line breaks
+    output = "\n".join(explanations)
+    # Print the output
+    print(output)
+  else:
+    # Print a message indicating no violations were found
+    print("No IPC violations were found in the prompt.")
+
+# Get the IPC data from a website
+ipc_df = get_ipc_data("https://www.indiacode.nic.in/bitstream/123456789/4219/1/THE-INDIAN-PENAL-CODE-1860.pdf")
+
+# Get the user prompt from the input
+prompt = input("Please enter a prompt describing an action or a crime: ")
+
+# Analyze the prompt for potential IPC violations
+violations = analyze_prompt(prompt)
+
+# Generate detailed explanations for each identified violation
+explanations = generate_explanations(violations)
+
+# Present the final output in a user-friendly format
+present_output(explanations)
