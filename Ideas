@@ -5,17 +5,13 @@ This is a page for all current ideas that we have:
 3) https://www.kaggle.com/competitions/AI4Code/overview  [Has Dataset]
 9) AI-powered Legal Documentation Assistant
   (a) https://www.indiacode.nic.in/bitstream/123456789/2263/1/aA1860-45.pdf - The Government of India's official codification of the Indian Penal Code
-  (b) Proposal: An action description (user or raw input, whichever goes) which checks against the IPC and returns potential violations?
+  (b) Proposal: An action description (user or raw input, whichever goes) that checks against the IPC and returns potential violations.
 
 https://www.kaggle.com/datasets/anudit/india-legal-cases-dataset
 
 Legal NLP ideas:
 1) Summarizer: Text to sentence to words to vectors to Similarity Matrix to Graphs to Sentence Ranking to Summary
-2) 
+2) IPC Violation checker. 
 
-We must first find datasets for all of the above.
-
-
-Explanation for the 9th idea:  [Taken from SIH]
-AI-powered solution that can simplify legal documentation for individuals and small businesses in India, by automatically drafting legal documents in plain language and using easy-to-understand terms.
-
+Final Idea taken for consideration:
+NLP system to analyze user prompts for potential Indian Penal Code (IPC) violations. Users input prompts describing actions or crimes, and the system employs a pre-trained NLP model to identify key entities and actions. Using rule-based logic or the model's understanding, the system detects potential IPC violations and maps them to relevant IPC sections. Theoretical penalties associated with each violation are then extracted from the IPC data. The system generates detailed explanations for each identified violation, including the specific IPC section, violation details, and the theoretical penalty. The final output is presented in a user-friendly format. This project aims to provide users with insights into how their described actions may violate the IPC, fostering legal awareness and understanding.
