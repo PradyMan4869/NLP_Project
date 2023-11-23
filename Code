@@ -1,4 +1,5 @@
 !pip install spacy 
+!pip install PyPDF2
 !python -m spacy download en_core_web_lg
 
 # Import the necessary libraries
@@ -6,29 +7,82 @@ import spacy # for NLP tasks
 import pandas as pd # for data manipulation
 import requests # for web scraping
 import re # for regular expressions
+import nltk
+from nltk.tokenize import sent_tokeniz
+
+# import the PyPDF2 package
+import PyPDF2
+
+# open the PDF file in binary mode
+pdf_file = open("IPC1860.pdf", "rb")
+
+# create a PDF reader object
+pdf_reader = PyPDF2.PdfReader(pdf_file)
+
+# initialize an empty string to store the text
+pdf_text = ""
+
+# loop through the pages of the PDF file
+for page in pdf_reader.pages:
+  # extract the text from the page
+  page_text = page.extract_text()
+  # append the text to the pdf_text variable
+  pdf_text += page_text
+
+# close the PDF file
+pdf_file.close()
+
+ # extract the IPC sections, descriptions, and penalties using regular expressions
+  sections = re.findall(r"(\d+\.\s.+?)\.\s", pdf_text)
+  descriptions = re.findall(r"\n(.+?)\n-", pdf_text)
+  penalties = re.findall(r"\n(.+?)\n\.", pdf_text)
+
+  # import numpy
+import numpy as np
+
+# find the maximum length of the arrays
+maxlen = max(len(sections), len(descriptions), len(penalties))
+
+# resize the arrays to the maximum length
+sections = np.resize(sections, maxlen)
+descriptions = np.resize(descriptions, maxlen)
+penalties = np.resize(penalties, maxlen)
+
+  # create a data frame with the extracted data
+  ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
 
 # Load the pre-trained NLP model
 nlp = spacy.load("en_core_web_lg")
 
-# Define a function to scrape the IPC data from a website
-def get_ipc_data(url):
-  # Send a GET request to the url and get the response
-  response = requests.get(url)
-  # Check if the response is successful
-  if response.status_code == 200:
-    # Parse the response content as HTML
-    html = response.text
-    # Extract the IPC sections, descriptions, and penalties using regular expressions
-    sections = re.findall(r"<h3>(\d+\.\s.+?)</h3>", html)
-    descriptions = re.findall(r"<p>(.+?)</p>", html)
-    penalties = re.findall(r"<strong>(.+?)</strong>", html)
-    # Create a data frame with the extracted data
-    ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
-    # Return the data frame
-    return ipc_df
-  else:
-    # Raise an exception if the response is not successful
-    raise Exception(f"Failed to get the IPC data from {url}")
+# Define a function to read, tokenize and pre-process the PDF file
+def get_ipc_data_from_pdf(pdf_file_name):
+  # open the PDF file in binary mode
+  pdf_file = open(pdf_file_name, "rb")
+  # create a PDF reader object
+  pdf_reader = PyPDF2.PdfReader(pdf_file)
+  # initialize an empty string to store the text
+  pdf_text = ""
+  # loop through the pages of the PDF file
+  for page in pdf_reader.pages:
+    # extract the text from the page
+    page_text = page.extract_text()
+    # append the text to the pdf_text variable
+    pdf_text += page_text
+  # close the PDF file
+  pdf_file.close()
+  # extract the IPC sections, descriptions, and penalties using regular expressions
+  sections = re.findall(r"(\d+\.\s.+?)\.\s", pdf_text)
+  descriptions = re.findall(r"\n(.+?)\n-", pdf_text)
+  penalties = re.findall(r"\n(.+?)\n\.", pdf_text)
+  # resize the arrays to the maximum length using numpy
+  maxlen = max(len(sections), len(descriptions), len(penalties))
+  sections = np.resize(sections, maxlen)
+  descriptions = np.resize(descriptions, maxlen)
+  penalties = np.resize(penalties, maxlen)
+  # create a data frame with the extracted data
+  ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
+  # return the data frame
+  return ipc_df
 
 # Define a function to analyze the user prompt for potential IPC violations
 def analyze_prompt(prompt):
@@ -75,8 +129,8 @@ def present_output(explanations):
     # Print a message indicating no violations were found
     print("No IPC violations were found in the prompt.")
 
-# Get the IPC data from a website
-ipc_df = get_ipc_data("https://www.indiacode.nic.in/bitstream/123456789/4219/1/THE-INDIAN-PENAL-CODE-1860.pdf")
+# Get the IPC data from the PDF file
+ipc_df = get_ipc_data_from_pdf("IPC1860.pdf")
 
 # Get the user prompt from the input
 prompt = input("Please enter a prompt describing an action or a crime: ")
