@@ -8,7 +8,7 @@ import pandas as pd # for data manipulation
 import requests # for web scraping
 import re # for regular expressions
 import nltk
-from nltk.tokenize import sent_tokeniz
+from nltk.tokenize import sent_tokenize
 
 # import the PyPDF2 package
 import PyPDF2
@@ -85,22 +85,25 @@ def get_ipc_data_from_pdf(pdf_file_name):
   return ipc_df
 
 # Define a function to analyze the user prompt for potential IPC violations
-def analyze_prompt(prompt):
-  # Apply the NLP model to the prompt
-  doc = nlp(prompt)
-  # Extract the key entities and actions from the prompt
-  entities = [ent.text for ent in doc.ents]
-  actions = [token.lemma_ for token in doc if token.pos_ == "VERB"]
-  # Initialize an empty list to store the identified violations
-  violations = []
-  # Loop through the IPC data frame
-  for index, row in ipc_df.iterrows():
-    # Check if any of the entities or actions match the IPC description
-    if any(word in row["description"] for word in entities + actions):
-      # Append the IPC section, description, and penalty to the violations list
-      violations.append((row["section"], row["description"], row["penalty"]))
-  # Return the violations list
-  return violations
+def analyze_prompt(prompt, ipc_data):
+    # Apply the NLP model to the prompt
+    doc = nlp(prompt)
+    # Extract the key entities and actions from the prompt
+    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT']]
+    actions = [token.lemma_.lower() for token in doc if token.pos_ == "VERB"]
+
+    # Initialize an empty list to store the identified violations
+    violations = []
+    
+    # Loop through the IPC data
+    for index, row in ipc_data.iterrows():
+        # Check if any of the entities or actions match the IPC description
+        if any(word in row["description"].lower() for word in entities + actions):
+            # Append the IPC section, description, and penalty to the violations list
+            violations.append((row["section"], row["description"], row["penalty"]))
+    
+    # Return the violations list
+    return violations
 
 # Define a function to generate detailed explanations for each identified violation
 def generate_explanations(violations):
@@ -135,8 +138,8 @@ ipc_df = get_ipc_data_from_pdf("IPC1860.pdf")
 # Get the user prompt from the input
 prompt = input("Please enter a prompt describing an action or a crime: ")
 
-# Analyze the prompt for potential IPC violations
-violations = analyze_prompt(prompt)
+# Analyze the prompt for potential IPC violations using the updated function
+violations = analyze_prompt(prompt, ipc_df)
 
 # Generate detailed explanations for each identified violation
 explanations = generate_explanations(violations)
