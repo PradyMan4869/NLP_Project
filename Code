@@ -88,8 +88,9 @@ def get_ipc_data_from_pdf(pdf_file_name):
 def analyze_prompt(prompt, ipc_data):
     # Apply the NLP model to the prompt
     doc = nlp(prompt)
+    
     # Extract the key entities and actions from the prompt
-    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT']]
+    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT', 'DATE', 'PRODUCT', 'LAW']]
     actions = [token.lemma_.lower() for token in doc if token.pos_ == "VERB"]
 
     # Initialize an empty list to store the identified violations
