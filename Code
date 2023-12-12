@@ -1,140 +1,135 @@
-!pip install spacy 
+!pip install -q transformers
+!pip install -q datasets
+!pip install -q requests
+!wget https://huggingface.co/nlpaueb/legal-bert-base-uncased/resolve/main/pytorch_model.bin -O legal_bert_base.bin
+!pip install spacy
 !pip install PyPDF2
-!python -m spacy download en_core_web_lg
 
-# Import the necessary libraries
-import spacy # for NLP tasks
-import pandas as pd # for data manipulation
-import requests # for web scraping
-import re # for regular expressions
+
+# Import libraries
+from transformers import AutoModel, AutoTokenizer
+import requests
+from bs4 import BeautifulSoup
+import re
+
+# Import NLTK
 import nltk
+nltk.download('wordnet')
+nltk.download('punkt')
+nltk.download('stopwords')
 from nltk.tokenize import sent_tokenize
+
+# Define pre-trained model and tokenizer names
+model_name = "casehold/legalbert"
+
+# Load pre-trained model and tokenizer
+model = AutoModel.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+
+# Import other dependencies
+import numpy as np
+import pandas as pd
+import torch
 
 # import the PyPDF2 package
 import PyPDF2
 
-# open the PDF file in binary mode
-pdf_file = open("IPC1860.pdf", "rb")
+# Define pre-trained model and tokenizer names
+model_name = "casehold/legalbert"
 
-# create a PDF reader object
+# Download the IPC document (adjust URL if needed)
+url = "https://www.indiacode.nic.in/bitstream/123456789/4219/1/THE-INDIAN-PENAL-CODE-1860.pdf"
+
+# Extracting data from pdf file
+pdf_file = open("/content/drive/MyDrive/aA1860-45.pdf", "rb")
 pdf_reader = PyPDF2.PdfReader(pdf_file)
-
-# initialize an empty string to store the text
-pdf_text = ""
-
-# loop through the pages of the PDF file
+ipc_text = ""
 for page in pdf_reader.pages:
-  # extract the text from the page
-  page_text = page.extract_text()
-  # append the text to the pdf_text variable
-  pdf_text += page_text
+page_text = page.extract_text()
+ipc_text += page_text
 
-# close the PDF file
-pdf_file.close()
-
- # extract the IPC sections, descriptions, and penalties using regular expressions
-  sections = re.findall(r"(\d+\.\s.+?)\.\s", pdf_text)
-  descriptions = re.findall(r"\n(.+?)\n-", pdf_text)
-  penalties = re.findall(r"\n(.+?)\n\.", pdf_text)
-
-  # import numpy
+# Preprocesses the text data for analysis.
+def preprocess_text(text):
+# Lowercase conversion
+text = text.lower()
+# Remove punctuation
+text = re.sub(r'[^\w\s]', '', text)
+# Tokenization
+tokens = nltk.word_tokenize(text)
+# Lemmatization
+lemmatizer = nltk.WordNetLemmatizer()
+lemmatized_tokens = [lemmatizer.lemmatize(token) for token in tokens]
+# Stop word removal
+stop_words = nltk.corpus.stopwords.words('english')
+filtered_tokens = [token for token in lemmatized_tokens if token not in stop_words]
+# Join the pre-processed text
+text = ' '.join(lemmatized_tokens)
+return text
 import numpy as np
 
-# find the maximum length of the arrays
+# Define functions for data extraction and analysis
+def get_ipc_data_from_text(ipc_text):
+# Extract sections, descriptions, and penalties using regular expressions
+sections = re.findall(r"(\d+\.\s.+?)\.\s", ipc_text)
+descriptions = re.findall(r"\n(.+?)\n-", ipc_text)
+penalties = re.findall(r"\n(.+?)\n\.", ipc_text)
+
+# Find the maximum length of the arrays
 maxlen = max(len(sections), len(descriptions), len(penalties))
 
-# resize the arrays to the maximum length
+# Resize the arrays to the maximum length using numpy
 sections = np.resize(sections, maxlen)
 descriptions = np.resize(descriptions, maxlen)
 penalties = np.resize(penalties, maxlen)
 
-  # create a data frame with the extracted data
-  ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
+# Create a data frame with the extracted data
+ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
 
-# Load the pre-trained NLP model
-nlp = spacy.load("en_core_web_lg")
+return ipc_df
+def analyze_prompt(text, ipc_data):
+# Preprocess the text
+text = preprocess_text(text)
 
-# Define a function to read, tokenize and pre-process the PDF file
-def get_ipc_data_from_pdf(pdf_file_name):
-  # open the PDF file in binary mode
-  pdf_file = open(pdf_file_name, "rb")
-  # create a PDF reader object
-  pdf_reader = PyPDF2.PdfReader(pdf_file)
-  # initialize an empty string to store the text
-  pdf_text = ""
-  # loop through the pages of the PDF file
-  for page in pdf_reader.pages:
-    # extract the text from the page
-    page_text = page.extract_text()
-    # append the text to the pdf_text variable
-    pdf_text += page_text
-  # close the PDF file
-  pdf_file.close()
-  # extract the IPC sections, descriptions, and penalties using regular expressions
-  sections = re.findall(r"(\d+\.\s.+?)\.\s", pdf_text)
-  descriptions = re.findall(r"\n(.+?)\n-", pdf_text)
-  penalties = re.findall(r"\n(.+?)\n\.", pdf_text)
-  # resize the arrays to the maximum length using numpy
-  maxlen = max(len(sections), len(descriptions), len(penalties))
-  sections = np.resize(sections, maxlen)
-  descriptions = np.resize(descriptions, maxlen)
-  penalties = np.resize(penalties, maxlen)
-  # create a data frame with the extracted data
-  ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
-  # return the data frame
-  return ipc_df
+# Encode the text into tokens and attention masks using the tokenizer
+inputs = tokenizer(text, return_tensors="pt")
 
-# Define a function to analyze the user prompt for potential IPC violations
-def analyze_prompt(prompt, ipc_data):
-    # Apply the NLP model to the prompt
-    doc = nlp(prompt)
-    
-    # Extract the key entities and actions from the prompt
-    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'EVENT', 'DATE', 'PRODUCT', 'LAW']]
-    actions = [token.lemma_.lower() for token in doc if token.pos_ == "VERB"]
+# Pass the encoded inputs to the model
+outputs = model(**inputs)
 
-    # Initialize an empty list to store the identified violations
-    violations = []
-    
-    # Loop through the IPC data
-    for index, row in ipc_data.iterrows():
-        # Check if any of the entities or actions match the IPC description
-        if any(word in row["description"].lower() for word in entities + actions):
-            # Append the IPC section, description, and penalty to the violations list
-            violations.append((row["section"], row["description"], row["penalty"]))
-    
-    # Return the violations list
-    return violations
+
+
 
 # Define a function to generate detailed explanations for each identified violation
 def generate_explanations(violations):
-  # Initialize an empty list to store the explanations
-  explanations = []
-  # Loop through the violations list
-  for violation in violations:
-    # Unpack the violation tuple
-    section, description, penalty = violation
-    # Generate an explanation using the violation details
-    explanation = f"According to IPC section {section}, {description}. The theoretical penalty for this violation is {penalty}."
-    # Append the explanation to the explanations list
-    explanations.append(explanation)
-  # Return the explanations list
-  return explanations
+# Initialize an empty list to store the explanations
+explanations = []
+# Loop through the violations list
+violations = []
+for violation in violations:
+# Unpack the violation tuple
+section, description, penalty = violation
+# Generate an explanation using the violation details
+explanation = f"According to IPC section {section}, {description}. The theoretical penalty for this violation is {penalty}."
+# Append the explanation to the explanations list
+explanations.append(explanation)
+# Return the explanations list
+return explanations
 
 # Define a function to present the final output in a user-friendly format
 def present_output(explanations):
-  # Check if the explanations list is empty or not
-  if explanations:
-    # Join the explanations with line breaks
-    output = "\n".join(explanations)
-    # Print the output
-    print(output)
-  else:
-    # Print a message indicating no violations were found
-    print("No IPC violations were found in the prompt.")
+# Check if the explanations list is empty or not
+if explanations:
+# Join the explanations with line breaks
+output = "\n".join(explanations)
+# Print the output
+print(output)
+else:
+# Print a message indicating no violations were found
+print("No IPC violations were found in the prompt.")
 
 # Get the IPC data from the PDF file
-ipc_df = get_ipc_data_from_pdf("IPC1860.pdf")
+ipc_df = get_ipc_data_from_text("IPC1860.pdf")
 
 # Get the user prompt from the input
 prompt = input("Please enter a prompt describing an action or a crime: ")
