@@ -1,144 +1,188 @@
-!pip install -q transformers
-!pip install -q datasets
-!pip install -q requests
-!wget https://huggingface.co/nlpaueb/legal-bert-base-uncased/resolve/main/pytorch_model.bin -O legal_bert_base.bin
-!pip install spacy
+# Install required libraries
+!pip install transformers
 !pip install PyPDF2
+!pip install nltk
 
-
-# Import libraries
+# Import necessary libraries
 from transformers import AutoModel, AutoTokenizer
 import requests
 from bs4 import BeautifulSoup
 import re
-
-# Import NLTK
 import nltk
 nltk.download('wordnet')
 nltk.download('punkt')
 nltk.download('stopwords')
+nltk.download('averaged_perceptron_tagger')
 from nltk.tokenize import sent_tokenize
-
-# Define pre-trained model and tokenizer names
-model_name = "casehold/legalbert"
-
-# Load pre-trained model and tokenizer
-model = AutoModel.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-
-# Import other dependencies
 import numpy as np
 import pandas as pd
 import torch
-
-# import the PyPDF2 package
 import PyPDF2
 
-# Define pre-trained model and tokenizer names
-model_name = "casehold/legalbert"
+# Define preprocess_text function
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', '', text)
+    tokens = nltk.word_tokenize(text)
+    lemmatizer = nltk.WordNetLemmatizer()
+    lemmatized_tokens = [lemmatizer.lemmatize(token) for token in tokens]
+    stop_words = nltk.corpus.stopwords.words('english')
+    filtered_tokens = [token for token in lemmatized_tokens if token not in stop_words]
+    text = ' '.join(filtered_tokens)
+    return text
 
-# Download the IPC document (adjust URL if needed)
+# Function to extract text from PDF in sentences
+def extract_text_sentences(pdf_file_path):
+    with open(pdf_file_path, "rb") as pdf_file:
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        ipc_text_sentences = []
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            sentences = sent_tokenize(page_text)
+            ipc_text_sentences.extend(sentences)
+    return ipc_text_sentences
+
+# URL of the PDF file
 url = "https://www.indiacode.nic.in/bitstream/123456789/4219/1/THE-INDIAN-PENAL-CODE-1860.pdf"
 
-# Extracting data from pdf file
-pdf_file = open("/content/drive/MyDrive/aA1860-45.pdf", "rb")
-pdf_reader = PyPDF2.PdfReader(pdf_file)
-ipc_text = ""
-for page in pdf_reader.pages:
-page_text = page.extract_text()
-ipc_text += page_text
+# Download the PDF file
+file_path = "/content/aA1860-45.pdf"
+with open(file_path, "wb") as file:
+    response = requests.get(url)
+    file.write(response.content)
 
-# Preprocesses the text data for analysis.
-def preprocess_text(text):
-# Lowercase conversion
-text = text.lower()
-# Remove punctuation
-text = re.sub(r'[^\w\s]', '', text)
-# Tokenization
-tokens = nltk.word_tokenize(text)
-# Lemmatization
-lemmatizer = nltk.WordNetLemmatizer()
-lemmatized_tokens = [lemmatizer.lemmatize(token) for token in tokens]
-# Stop word removal
-stop_words = nltk.corpus.stopwords.words('english')
-filtered_tokens = [token for token in lemmatized_tokens if token not in stop_words]
-# Join the pre-processed text
-text = ' '.join(lemmatized_tokens)
-return text
-import numpy as np
+# Extract text from the PDF in sentences
+ipc_sentences = extract_text_sentences(file_path)
 
-# Define functions for data extraction and analysis
-def get_ipc_data_from_text(ipc_text):
-# Extract sections, descriptions, and penalties using regular expressions
-sections = re.findall(r"(\d+\.\s.+?)\.\s", ipc_text)
-descriptions = re.findall(r"\n(.+?)\n-", ipc_text)
-penalties = re.findall(r"\n(.+?)\n\.", ipc_text)
+# Preprocess sentences for analysis
+preprocessed_sentences = [preprocess_text(sentence) for sentence in ipc_sentences]
 
-# Find the maximum length of the arrays
-maxlen = max(len(sections), len(descriptions), len(penalties))
+# Create a DataFrame with preprocessed sentences
+ipc_df_sentences = pd.DataFrame({"preprocessed_sentence": preprocessed_sentences})
 
-# Resize the arrays to the maximum length using numpy
-sections = np.resize(sections, maxlen)
-descriptions = np.resize(descriptions, maxlen)
-penalties = np.resize(penalties, maxlen)
+# Function to extract IPC data from sentences
+# Function to extract IPC data from sentences with POS tagging
+def get_ipc_data_from_sentences(ipc_sentences):
+    section_pattern = re.compile(r"(\d+\.\s.+?)\.\s")
+    description_pattern = re.compile(r"\n(.+?)\n-")
+    penalty_pattern = re.compile(r"\n(.+?)\n\.")
 
-# Create a data frame with the extracted data
-ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties})
+    sections = []
+    descriptions = []
+    penalties = []
+    pos_tags = []  # POS tags for descriptions
 
-return ipc_df
+    for sentence in ipc_sentences:
+        section_match = re.search(section_pattern, sentence)
+        if section_match:
+            sections.append(section_match.group(1))
+        else:
+            sections.append(None)
+            print("No section found in:", sentence)
+
+        description_match = re.search(description_pattern, sentence)
+        if description_match:
+            description = description_match.group(1)
+            descriptions.append(description)
+
+            # POS tagging for descriptions
+            tokens = nltk.word_tokenize(description)
+            tagged_tokens = nltk.pos_tag(tokens)
+            pos_tags.append(tagged_tokens)
+        else:
+            descriptions.append(None)
+            pos_tags.append(None)
+            print("No description found in:", sentence)
+
+        penalty_match = re.search(penalty_pattern, sentence)
+        if penalty_match:
+            penalties.append(penalty_match.group(1))
+        else:
+            penalties.append(None)
+            print("No penalty found in:", sentence)
+
+    ipc_df = pd.DataFrame({"section": sections, "description": descriptions, "penalty": penalties, "pos_tags": pos_tags})
+    return ipc_df
+
+# Create DataFrame with IPC data extracted from sentences
+ipc_df = get_ipc_data_from_sentences(ipc_sentences)
+
+# Define analyze_prompt function
 def analyze_prompt(text, ipc_data):
-# Preprocess the text
-text = preprocess_text(text)
+    try:
+        text = preprocess_text(text)
+        tagged_words = nltk.pos_tag(nltk.word_tokenize(text))
 
-# Encode the text into tokens and attention masks using the tokenizer
-inputs = tokenizer(text, return_tensors="pt")
+        verbs = [word for word, tag in tagged_words if tag.startswith("VB")]
 
-# Pass the encoded inputs to the model
-outputs = model(**inputs)
+        if not verbs:
+            verbs = [word for word, tag in tagged_words if tag.startswith("VB") or tag.startswith("NN")]
+
+        verbs = set(verbs)
+
+        print("Processed Text:", text)
+        print("Identified Verbs:", verbs)
+
+        legal_verbs = set()
+        for verb in verbs:
+            try:
+                for index, row in ipc_data.iterrows():
+                    pos_tags = row['pos_tags']
+                    if pos_tags:
+                        matching_words = [word for word, tag in pos_tags if tag.startswith("VB") and word == verb]
+                        if matching_words:
+                            legal_verbs.add(verb)
+                            break
+                else:
+                    legal_verbs.add(verb)
+            except Exception as e:
+                print(f"Error in matching for '{verb}': {e}")
+
+        violations = []
+        for legal_verb in legal_verbs:
+            try:
+                regex = r"\b({})\b|{}".format(legal_verb, "|".join(synset.lemma_names() for synset in nltk.corpus.wordnet.synsets(legal_verb)))
+                matches = re.finditer(regex, str(ipc_data["description"]))
+                for match in matches:
+                    section = ipc_data["section"][match.start()] if match.start() < len(ipc_data["section"]) else None
+                    description = ipc_data["description"][match.start()] if match.start() < len(ipc_data["description"]) else None
+                    penalty = ipc_data["penalty"][match.start()] if match.start() < len(ipc_data["penalty"]) else None
+                    violations.append((section, description, penalty))
+            except Exception as e:
+                print(f"Error in matching for '{legal_verb}': {e}")
+
+    except Exception as e:
+        print(f"Error while analyzing prompt: {e}")
+        return []
+
+    return violations
 
 
-
-
-# Define a function to generate detailed explanations for each identified violation
+# Define generate_explanations function
 def generate_explanations(violations):
-# Initialize an empty list to store the explanations
-explanations = []
-# Loop through the violations list
-violations = []
-for violation in violations:
-# Unpack the violation tuple
-section, description, penalty = violation
-# Generate an explanation using the violation details
-explanation = f"According to IPC section {section}, {description}. The theoretical penalty for this violation is {penalty}."
-# Append the explanation to the explanations list
-explanations.append(explanation)
-# Return the explanations list
-return explanations
+    explanations = []
+    for violation in violations:
+        section, description, penalty = violation
+        explanation = f"According to IPC section {section}, {description}. The theoretical penalty for this violation is {penalty}."
+        explanations.append(explanation)
+    return explanations
 
-# Define a function to present the final output in a user-friendly format
+# Define present_output function
 def present_output(explanations):
-# Check if the explanations list is empty or not
-if explanations:
-# Join the explanations with line breaks
-output = "\n".join(explanations)
-# Print the output
-print(output)
-else:
-# Print a message indicating no violations were found
-print("No IPC violations were found in the prompt.")
+    if explanations:
+        output = "\n".join(explanations)
+        print(output)
+    else:
+        print("No IPC violations were found in the prompt.")
 
-# Get the IPC data from the PDF file
-ipc_df = get_ipc_data_from_text("IPC1860.pdf")
-
-# Get the user prompt from the input
+# Get user prompt
 prompt = input("Please enter a prompt describing an action or a crime: ")
 
-# Analyze the prompt for potential IPC violations using the updated function
+# Analyze the prompt and generate explanations
 violations = analyze_prompt(prompt, ipc_df)
 
 # Generate detailed explanations for each identified violation
 explanations = generate_explanations(violations)
 
-# Present the final output in a user-friendly format
+# Present the final output
 present_output(explanations)
