@@ -18,6 +18,12 @@ import numpy as np
 import pandas as pd
 import torch
 import PyPDF2
+import itertools
+
+import PyPDF2
+import re
+import nltk
+from nltk.tokenize import sent_tokenize
 
 # Define preprocess_text function
 def preprocess_text(text):
@@ -42,14 +48,8 @@ def extract_text_sentences(pdf_file_path):
             ipc_text_sentences.extend(sentences)
     return ipc_text_sentences
 
-# URL of the PDF file
-url = "https://www.indiacode.nic.in/bitstream/123456789/4219/1/THE-INDIAN-PENAL-CODE-1860.pdf"
-
-# Download the PDF file
-file_path = "/content/aA1860-45.pdf"
-with open(file_path, "wb") as file:
-    response = requests.get(url)
-    file.write(response.content)
+# Path to the PDF file
+file_path = "ipc_corpus.pdf"  # Replace with the correct path to your "ipc_corpus.pdf" file
 
 # Extract text from the PDF in sentences
 ipc_sentences = extract_text_sentences(file_path)
@@ -108,55 +108,86 @@ def get_ipc_data_from_sentences(ipc_sentences):
 ipc_df = get_ipc_data_from_sentences(ipc_sentences)
 
 # Define analyze_prompt function
+from itertools import chain
+
 def analyze_prompt(text, ipc_data):
-    try:
-        text = preprocess_text(text)
-        tagged_words = nltk.pos_tag(nltk.word_tokenize(text))
+  try:
+    # Preprocess the text
+    text = preprocess_text(text)
 
-        verbs = [word for word, tag in tagged_words if tag.startswith("VB")]
+    # Get POS tags for words
+    for index, row in ipc_data.iterrows():
+      pos_tags = row['pos_tags']
 
-        if not verbs:
-            verbs = [word for word, tag in tagged_words if tag.startswith("VB") or tag.startswith("NN")]
+    # Extract verbs, prioritizing VB tags and allowing fallback to NN if no verbs found
+    verbs = [word for word, tag in nltk.pos_tag(nltk.word_tokenize(text)) if tag.startswith("VB")]
+    if not verbs:
+      verbs = [word for word, tag in nltk.pos_tag(nltk.word_tokenize(text)) if tag.startswith("VB") or tag.startswith("NN")]
 
-        verbs = set(verbs)
+    # Make verbs unique
+    verbs = set(verbs)
 
-        print("Processed Text:", text)
-        print("Identified Verbs:", verbs)
+    # Print processed text and identified verbs for debugging
+    print("Processed Text:", text)
+    print("Identified Verbs:", verbs)
 
-        legal_verbs = set()
-        for verb in verbs:
-            try:
-                for index, row in ipc_data.iterrows():
-                    pos_tags = row['pos_tags']
-                    if pos_tags:
-                        matching_words = [word for word, tag in pos_tags if tag.startswith("VB") and word == verb]
-                        if matching_words:
-                            legal_verbs.add(verb)
-                            break
-                else:
-                    legal_verbs.add(verb)
-            except Exception as e:
-                print(f"Error in matching for '{verb}': {e}")
+    # Initialize set of legal verbs found in IPC descriptions
+    legal_verbs = set()
 
-        violations = []
-        for legal_verb in legal_verbs:
-            try:
-                regex = r"\b({})\b|{}".format(legal_verb, "|".join(synset.lemma_names() for synset in nltk.corpus.wordnet.synsets(legal_verb)))
-                matches = re.finditer(regex, str(ipc_data["description"]))
-                for match in matches:
-                    section = ipc_data["section"][match.start()] if match.start() < len(ipc_data["section"]) else None
-                    description = ipc_data["description"][match.start()] if match.start() < len(ipc_data["description"]) else None
-                    penalty = ipc_data["penalty"][match.start()] if match.start() < len(ipc_data["penalty"]) else None
-                    violations.append((section, description, penalty))
-            except Exception as e:
-                print(f"Error in matching for '{legal_verb}': {e}")
+    # Loop through each identified verb
+    for verb in verbs:
+      try:
+        # Handle different tag formats: single element (word only) or tuple (word, tag)
+        if isinstance(pos_tags, str):
+          # Single-word tag: Check direct match for verb, "theft", and "Grand Theft Auto"
+          matching_words = [pos_tags] if pos_tags == verb or pos_tags.lower() == "theft" or pos_tags.lower() == "grand theft auto" else []
+        elif pos_tags:
+          # Tuple list: Use chain.from_iterable for flattening and verb match
+          matching_words = [word for word, tag in chain.from_iterable(pos_tags) if tag.startswith("VB") and word == verb]
+          # Filter out empty values
+          matching_words = [word for word in matching_words if word]
+        else:
+          matching_words = []
 
-    except Exception as e:
-        print(f"Error while analyzing prompt: {e}")
-        return []
+        # If matching word found, add verb to legal verbs and break to next row
+        if matching_words:
+          legal_verbs.add(verb)
+          break
 
-    return violations
+      except Exception as e:
+        print(f"Error in matching for '{verb}': {e}")
 
+    # Initialize list of identified violations
+    violations = []
+
+    # Loop through each legal verb found
+    for legal_verb in legal_verbs:
+      try:
+        # Create regex pattern for matching verb and its relevant synonyms
+        # Modify synonym selection based on your specific IPC data and needs
+        regex = r"\b({})\b|{}".format(legal_verb, "|".join(synset.lemma_names() for synset in nltk.corpus.wordnet.synsets(legal_verb) if "theft" in synset.definition()))
+
+        # Find all matches of the pattern in IPC descriptions
+        matches = re.finditer(regex, str(ipc_data["description"]))
+
+        # Loop through each match
+        for match in matches:
+          # Extract relevant information from matched description
+          section = ipc_data["section"][match.start()] if match.start() < len(ipc_data["section"]) else None
+          description = ipc_data["description"][match.start()] if match.start() < len(ipc_data["description"]) else None
+          penalty = ipc_data["penalty"][match.start()] if match.start() < len(ipc_data["penalty"]) else None
+
+          # Append extracted information to list of violations
+          violations.append((section, description, penalty))
+
+      except Exception as e:
+        print(f"Error in matching for '{legal_verb}': {e}")
+
+  except Exception as e:
+    print(f"Error while analyzing prompt: {e}")
+    return []
+
+  return violations
 
 # Define generate_explanations function
 def generate_explanations(violations):
